@@ -1,0 +1,36 @@
+# Entorno virtual
+venv/
+.venv/
+env/
+
+# Bytecode y caché de Python / Django
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.coverage
+*.log
+
+# Base de datos SQLite local (generada con migraciones)
+db.sqlite3
+db.sqlite3-journal
+db.sqlite3-wal
+db.sqlite3-shm
+
+# Secretos y variables de entorno
+.env
+.env.*
+!.env.example
+
+# Archivos estcleaáticos o subidos generados en runtime
+staticfiles/
+media/
+
+# IDEs y sistema
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

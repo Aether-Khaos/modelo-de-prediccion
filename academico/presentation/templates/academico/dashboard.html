@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modelo de Regresión Lineal Múltiple — Análisis Académico</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,500;0,6..72,600;1,6..72,400&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        ink: '#0F172A',
+                        surface: '#F7F8FC',
+                        brand: {
+                            50:  '#F1F2FB',
+                            100: '#E3E5F7',
+                            200: '#C9CCF0',
+                            300: '#A7ABE6',
+                            400: '#8589DB',
+                            500: '#6E72D1',
+                            600: '#5B5FDE',  /* morado suavizado */
+                            700: '#4A4DC7',
+                            800: '#3F3FA8',
+                            900: '#36357F'
+                        },
+                        mint:  '#10B981',
+                        amber: '#F59E0B',
+                        rose:  '#F43F5E'
+                    },
+                    boxShadow: {
+                        card:   '0 1px 2px rgba(15,23,42,.04), 0 8px 24px -12px rgba(15,23,42,.12)',
+                        sticky: '0 8px 24px -12px rgba(91,95,222,.35)'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'IBM Plex Sans', -apple-system, sans-serif;
+            background:
+                radial-gradient(1200px 600px at 100% -10%, #F1F2FB 0%, transparent 60%),
+                radial-gradient(900px 500px at -10% 110%, #ECFEFF 0%, transparent 55%),
+                #F7F8FC;
+            color: #0F172A;
+        }
+        .font-serif-acad { font-family: 'Newsreader', Georgia, serif; }
+        .mono { font-family: 'IBM Plex Mono', monospace; }
+
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 999px; border: 2px solid #F7F8FC; }
+        ::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+
+        .nav-tab {
+            position: relative;
+            color: #64748B;
+            transition: color .18s ease, background .18s ease;
+            border-radius: 10px;
+            padding: 10px 14px;
+        }
+        .nav-tab:hover { color: #0F172A; background: #F1F5F9; }
+        .nav-tab.active {
+            color: #fff;
+            background: linear-gradient(135deg, #5B5FDE, #8B5CF6);
+            font-weight: 600;
+            box-shadow: 0 8px 20px -10px rgba(91,95,222,.55);
+        }
+
+        .field-input {
+            transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
+        }
+        .field-input:focus {
+            border-color: #5B5FDE;
+            box-shadow: 0 0 0 4px rgba(91,95,222,.12);
+            background: #fff;
+        }
+
+        .card {
+            background: #fff;
+            border: 1px solid #E2E8F0;
+            border-radius: 16px;
+            box-shadow: 0 1px 2px rgba(15,23,42,.04), 0 8px 24px -12px rgba(15,23,42,.12);
+        }
+
+        @media (min-width: 1024px) {
+            .side-panel {
+                position: sticky;
+                top: 72px;
+                align-self: flex-start;
+                max-height: calc(100vh - 88px);
+                overflow-y: auto;
+            }
+        }
+
+        /* CTA banner para el empty-state */
+        .empty-cta {
+            background: linear-gradient(135deg, #5B5FDE 0%, #8B5CF6 100%);
+            box-shadow: 0 10px 24px -12px rgba(91,95,222,.55);
+            transition: filter .18s ease, transform .18s ease;
+        }
+        .empty-cta:hover { filter: brightness(1.06); transform: translateY(-1px); }
+    </style>
+</head>
+<body class="min-h-screen w-full flex flex-col overflow-x-hidden">
+
+    <!-- ============ HEADER STICKY ============ -->
+    <header class="w-full bg-white/85 backdrop-blur-lg border-b border-slate-200/80 px-4 sm:px-6 h-16 flex items-center justify-between sticky top-0 z-40">
+        <div class="flex items-center space-x-3 sm:space-x-4 min-w-0">
+            <span class="mono text-[11px] font-semibold tracking-widest uppercase px-2.5 py-1.5 rounded-lg text-white bg-gradient-to-br from-brand-600 to-violet-500 shadow-sticky whitespace-nowrap">OLS · RLM</span>
+            <h1 class="font-serif-acad text-base sm:text-lg font-semibold tracking-tight text-slate-900 truncate">
+                Estimación del Rendimiento Académico
+            </h1>
+        </div>
+        <div class="flex items-center space-x-3 sm:space-x-6 text-xs text-slate-500 mono">
+            <span class="hidden md:inline px-3 py-1.5 rounded-lg bg-slate-100/80 border border-slate-200/60">β = (XᵀX)⁻¹XᵀY</span>
+
+            {% if resultado %}
+                <!-- ESTADO: CALIBRADO (verde sólido) -->
+                <span class="flex items-center gap-2 text-white font-semibold bg-emerald-600 px-3 py-1.5 rounded-lg shadow-sm">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    <span class="hidden sm:inline">Calibrado · n = {{ resultado.total_registros }}</span>
+                    <span class="sm:hidden">n={{ resultado.total_registros }}</span>
+                </span>
+            {% else %}
+                <!-- ESTADO: VACÍO (ámbar explícito) -->
+                <span class="flex items-center gap-2 text-amber-800 font-semibold bg-amber-100 border border-amber-300 px-3 py-1.5 rounded-lg">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                    <span class="hidden sm:inline">Sin datos · Cargue un CSV</span>
+                    <span class="sm:hidden">Sin datos</span>
+                </span>
+            {% endif %}
+        </div>
+    </header>
+
+    <!-- ============ LAYOUT ============ -->
+    <div class="flex-1 w-full flex flex-col lg:flex-row gap-0 lg:gap-6 px-0 lg:px-6 py-0 lg:py-6">
+
+        <!-- ============ PANEL IZQUIERDO (STICKY) ============ -->
+        <aside class="side-panel w-full lg:w-[380px] xl:w-[420px] flex-shrink-0 flex flex-col gap-5 px-4 py-5 lg:px-0 lg:py-0">
+            <div class="card p-5 sm:p-6 space-y-7">
+
+                <!-- MÓDULO I: INGESTA -->
+                <section id="ingesta">
+                    <div class="flex items-center justify-between mb-2">
+                        <h2 class="text-[11px] font-bold uppercase tracking-widest text-brand-700">I. Conjunto de Datos</h2>
+                        <span class="mono text-[10px] text-slate-400 px-2 py-0.5 rounded-md bg-slate-100">X1..X4, Y</span>
+                    </div>
+                    <p class="text-xs text-slate-500 leading-relaxed mb-4">
+                        Cargue el archivo con los registros históricos para resolver el sistema matricial.
+                    </p>
+
+                    <!-- BANNER DE ESTADO DENTRO DEL CARD -->
+                    {% if resultado %}
+                    <div class="mb-3 flex items-start gap-2.5 rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2.5">
+                        <svg class="flex-shrink-0 mt-0.5 text-emerald-600" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                        <div class="text-[11px] leading-snug">
+                            <p class="font-semibold text-emerald-800">Modelo calibrado</p>
+                            <p class="text-emerald-700">{{ resultado.total_registros }} registros activos. Cargue otro CSV para recalibrar.</p>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="mb-3 flex items-start gap-2.5 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2.5">
+                        <svg class="flex-shrink-0 mt-0.5 text-amber-600" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                        <div class="text-[11px] leading-snug">
+                            <p class="font-semibold text-amber-800">Sin modelo entrenado</p>
+                            <p class="text-amber-700">Debe cargar un CSV para habilitar la inferencia.</p>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <form method="post" enctype="multipart/form-data" class="space-y-3">
+                        {% csrf_token %}
+                        <input type="hidden" name="accion" value="entrenar">
+
+                        {% if resultado.nombre_archivo %}
+                        <p class="mono text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-2 py-1 truncate">
+                            📄 {{ resultado.nombre_archivo }}
+                        </p>
+                        {% endif %}
+
+                        <label class="group block w-full border-2 border-dashed border-slate-300 hover:border-brand-500 hover:bg-brand-50/40 bg-slate-50/60 rounded-xl p-4 text-center cursor-pointer transition">
+                            <svg class="mx-auto mb-2 text-slate-400 group-hover:text-brand-500 transition" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                            <span id="file-label" class="text-xs text-slate-600 font-medium block truncate">Seleccionar archivo .csv</span>
+                            <input type="file" name="archivo_csv" accept=".csv" required class="hidden"
+                                   onchange="document.getElementById('file-label').innerText = this.files[0] ? this.files[0].name : 'Seleccionar archivo .csv'">
+                        </label>
+                        <button type="submit" class="w-full bg-gradient-to-br from-brand-600 to-violet-500 hover:from-brand-700 hover:to-violet-600 text-white text-xs font-semibold uppercase tracking-wider py-3 px-4 rounded-xl transition shadow-sticky hover:shadow-lg">
+                            Ejecutar Ajuste Matricial
+                        </button>
+                    </form>
+                </section>
+
+                <div class="h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent"></div>
+
+                <!-- MÓDULO II: INFERENCIA -->
+                <section class="{% if not resultado %}opacity-50 pointer-events-none select-none{% endif %}">
+                    <div class="flex items-center justify-between mb-2">
+                        <h2 class="text-[11px] font-bold uppercase tracking-widest text-brand-700">II. Inferencia de Caso</h2>
+                        <span class="mono text-[10px] text-slate-400 px-2 py-0.5 rounded-md bg-slate-100">Ŷ = xᵀβ</span>
+                    </div>
+                    <p class="text-xs text-slate-500 leading-relaxed mb-4">
+                        Introduzca las covariables para estimar la calificación final.
+                    </p>
+
+                    <form method="post" class="space-y-3.5">
+                        {% csrf_token %}
+                        <input type="hidden" name="accion" value="predecir">
+
+                        <div>
+                            <div class="flex justify-between text-xs mb-1.5">
+                                <label class="text-slate-700 font-medium">X₁ · Horas estudio / sem</label>
+                                <span id="lbl-x1" class="mono text-brand-600 font-semibold">{{ prediccion.datos.horas_estudio|default:"10.0" }}</span>
+                            </div>
+                            <input type="number" step="0.1" min="0" max="80" name="x1" required
+                                   value="{{ prediccion.datos.horas_estudio|default:'10.0' }}"
+                                   oninput="document.getElementById('lbl-x1').innerText = this.value"
+                                   class="field-input w-full mono text-xs border border-slate-200 rounded-lg px-3 py-2.5 bg-slate-50/50 focus:bg-white focus:outline-none">
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between text-xs mb-1.5">
+                                <label class="text-slate-700 font-medium">X₂ · Asistencia (%)</label>
+                                <span id="lbl-x2" class="mono text-brand-600 font-semibold">{{ prediccion.datos.asistencia|default:"85.0" }}</span>
+                            </div>
+                            <input type="number" step="0.1" min="0" max="100" name="x2" required
+                                   value="{{ prediccion.datos.asistencia|default:'85.0' }}"
+                                   oninput="document.getElementById('lbl-x2').innerText = this.value"
+                                   class="field-input w-full mono text-xs border border-slate-200 rounded-lg px-3 py-2.5 bg-slate-50/50 focus:bg-white focus:outline-none">
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between text-xs mb-1.5">
+                                <label class="text-slate-700 font-medium">X₃ · Tareas (%)</label>
+                                <span id="lbl-x3" class="mono text-brand-600 font-semibold">{{ prediccion.datos.tareas_completadas|default:"80.0" }}</span>
+                            </div>
+                            <input type="number" step="0.1" min="0" max="100" name="x3" required
+                                   value="{{ prediccion.datos.tareas_completadas|default:'80.0' }}"
+                                   oninput="document.getElementById('lbl-x3').innerText = this.value"
+                                   class="field-input w-full mono text-xs border border-slate-200 rounded-lg px-3 py-2.5 bg-slate-50/50 focus:bg-white focus:outline-none">
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between text-xs mb-1.5">
+                                <label class="text-slate-700 font-medium">X₄ · Nota previa</label>
+                                <span id="lbl-x4" class="mono text-brand-600 font-semibold">{{ prediccion.datos.nota_previa|default:"75.0" }}</span>
+                            </div>
+                            <input type="number" step="0.1" min="0" max="100" name="x4" required
+                                   value="{{ prediccion.datos.nota_previa|default:'75.0' }}"
+                                   oninput="document.getElementById('lbl-x4').innerText = this.value"
+                                   class="field-input w-full mono text-xs border border-slate-200 rounded-lg px-3 py-2.5 bg-slate-50/50 focus:bg-white focus:outline-none">
+                        </div>
+
+                        <button type="submit" class="w-full border-2 border-brand-600 bg-white hover:bg-brand-600 text-brand-700 hover:text-white text-xs font-semibold uppercase tracking-wider py-2.5 px-4 rounded-xl transition">
+                            Estimar Calificación (Ŷ)
+                        </button>
+                    </form>
+
+                    {% if prediccion %}
+                    <div class="mt-5 rounded-xl border border-brand-200 bg-gradient-to-br from-brand-50 to-violet-50 p-4">
+                        <div class="flex items-center justify-between text-[10px] uppercase tracking-widest text-slate-500 font-semibold">
+                            <span>Resultado Estimado</span>
+                            <span class="mono px-2 py-0.5 rounded-md {% if prediccion.nota >= 51 %}bg-emerald-100 text-emerald-700{% else %}bg-rose-100 text-rose-600{% endif %}">
+                                {% if prediccion.nota >= 51 %}APROBADO{% else %}RIESGO{% endif %}
+                            </span>
+                        </div>
+                        <div class="mt-2 flex items-baseline justify-between">
+                            <span class="font-serif-acad text-4xl font-semibold text-slate-900">{{ prediccion.nota }}</span>
+                            <span class="mono text-xs text-slate-500">/ 100.00 pts</span>
+                        </div>
+                    </div>
+                    {% endif %}
+                </section>
+            </div>
+
+            <div class="hidden lg:block px-2 pb-2 text-[10px] text-slate-400 mono leading-relaxed">
+                Mínimos Cuadrados Ordinarios (OLS)<br>
+                Implementación matricial en NumPy
+            </div>
+        </aside>
+
+        <!-- ============ PANEL DERECHO ============ -->
+        <main class="flex-1 min-w-0 px-4 sm:px-6 lg:px-0 py-5 lg:py-0">
+
+            {% if error %}
+            <div class="mb-5 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-800 flex items-start gap-2">
+                <svg class="flex-shrink-0 mt-0.5" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                <span><strong class="uppercase tracking-wider mr-1">Error:</strong> {{ error }}</span>
+            </div>
+            {% endif %}
+
+            {% if not resultado %}
+            <!-- ========== ESTADO VACÍO (CLARO) ========== -->
+            <div class="card min-h-[70vh] flex flex-col items-center justify-center p-8 sm:p-12 text-center relative overflow-hidden">
+                <div class="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,#FEF3C7,transparent_55%)] pointer-events-none"></div>
+                <div class="relative max-w-lg space-y-5">
+                    <div class="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-lg shadow-amber-200">
+                        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                    </div>
+                    <div>
+                        <span class="inline-block mono text-[10px] uppercase tracking-widest text-amber-700 bg-amber-100 border border-amber-200 px-2.5 py-1 rounded-full font-semibold mb-3">
+                            Estado: sin datos
+                        </span>
+                        <h2 class="font-serif-acad text-2xl sm:text-3xl text-slate-900">A la espera de matriz de observaciones</h2>
+                    </div>
+                    <p class="text-sm text-slate-500 leading-relaxed">
+                        No hay modelo entrenado todavía. Cargue un archivo CSV en el panel
+                        <span class="inline-flex items-center gap-1 font-semibold text-brand-700">
+                            <svg class="hidden lg:inline" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+                            izquierdo
+                        </span>
+                        con las variables
+                        (<span class="mono text-[11px] bg-brand-50 text-brand-700 px-1.5 py-0.5 rounded">X1, X2, X3, X4</span>)
+                        y la respuesta
+                        (<span class="mono text-[11px] bg-brand-50 text-brand-700 px-1.5 py-0.5 rounded">Y</span>)
+                        para calcular <span class="mono text-[11px]">β = (XᵀX)⁻¹XᵀY</span>.
+                    </p>
+                    <div class="pt-2">
+                        <a href="#ingesta" class="empty-cta inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-white px-4 py-2.5 rounded-xl">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                            Ir a cargar CSV
+                        </a>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+
+            <!-- ========== MÉTRICAS ========== -->
+            <div class="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-5">
+                <div class="card p-5">
+                    <div class="text-[10px] uppercase tracking-widest text-slate-400 font-semibold">R² · Determinación</div>
+                    <div class="mt-2 flex items-baseline justify-between gap-2">
+                        <span class="mono text-2xl font-semibold text-slate-900">{{ resultado.r2 }}</span>
+                        <span class="text-[11px] text-emerald-600 font-medium bg-emerald-50 px-2 py-0.5 rounded-md whitespace-nowrap">{{ resultado.calidad_modelo }}</span>
+                    </div>
+                </div>
+                <div class="card p-5">
+                    <div class="text-[10px] uppercase tracking-widest text-slate-400 font-semibold">MAE</div>
+                    <div class="mt-2 flex items-baseline justify-between">
+                        <span class="mono text-2xl font-semibold text-slate-900">{{ resultado.mae }}</span>
+                        <span class="mono text-[10px] text-slate-400">u. Y</span>
+                    </div>
+                </div>
+                <div class="card p-5">
+                    <div class="text-[10px] uppercase tracking-widest text-slate-400 font-semibold">RMSE</div>
+                    <div class="mt-2 flex items-baseline justify-between">
+                        <span class="mono text-2xl font-semibold text-slate-900">{{ resultado.rmse }}</span>
+                        <span class="mono text-[10px] text-slate-400">u. Y</span>
+                    </div>
+                </div>
+                <div class="card p-5">
+                    <div class="text-[10px] uppercase tracking-widest text-slate-400 font-semibold">Muestra n × p</div>
+                    <div class="mt-2 flex items-baseline justify-between">
+                        <span class="mono text-2xl font-semibold text-slate-900">{{ resultado.total_registros }} × 5</span>
+                        <span class="mono text-[10px] text-slate-400">+β₀</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ========== TABS STICKY ========== -->
+            <div class="sticky top-16 z-20 -mx-4 sm:-mx-6 lg:mx-0 px-4 sm:px-6 lg:px-0 py-2 bg-[#F7F8FC]/90 backdrop-blur-md border-b border-slate-200/70 mb-5">
+                <div class="flex gap-1.5 overflow-x-auto">
+                    <button onclick="setTab('diagnostico')" id="tab-btn-diagnostico" class="nav-tab active text-[11px] uppercase tracking-wider whitespace-nowrap">
+                        01 · Diagnóstico
+                    </button>
+                    <button onclick="setTab('algebra')" id="tab-btn-algebra" class="nav-tab text-[11px] uppercase tracking-wider whitespace-nowrap">
+                        02 · Matricial
+                    </button>
+                    <button onclick="setTab('registros')" id="tab-btn-registros" class="nav-tab text-[11px] uppercase tracking-wider whitespace-nowrap">
+                        03 · Registros
+                    </button>
+                </div>
+            </div>
+
+            <!-- ========== PANEL 01: DIAGNÓSTICO ========== -->
+            <div id="panel-diagnostico" class="space-y-5">
+                <div class="card p-5 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+                    <div class="min-w-0">
+                        <span class="text-[10px] uppercase tracking-widest text-slate-400 font-semibold block">Función de Regresión Estimada</span>
+                        <p class="mono text-xs sm:text-sm text-slate-900 font-medium mt-1.5 leading-relaxed break-words">
+                            Ŷ = {{ resultado.beta.0 }} + ({{ resultado.beta.1 }})X₁ + ({{ resultado.beta.2 }})X₂ + ({{ resultado.beta.3 }})X₃ + ({{ resultado.beta.4 }})X₄
+                        </p>
+                    </div>
+                    <div class="text-[11px] text-slate-500 mono bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 whitespace-nowrap self-start xl:self-auto">
+                        Sklearn: {{ resultado.beta_sklearn }}
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 xl:grid-cols-2 gap-5">
+                    <div class="card p-5">
+                        <img src="data:image/png;base64,{{ resultado.grafica_dispersion }}" alt="Ajuste del modelo" class="w-full h-auto rounded-lg">
+                        <p class="text-xs text-slate-500 mt-3 pt-3 border-t border-slate-100 leading-relaxed">
+                            <strong class="text-slate-700">Nota:</strong> La proximidad a la recta punteada (Y = Ŷ) indica concordancia entre valores reales y estimados.
+                        </p>
+                    </div>
+                    <div class="card p-5">
+                        <img src="data:image/png;base64,{{ resultado.grafica_residuales }}" alt="Análisis de residuales" class="w-full h-auto rounded-lg">
+                        <p class="text-xs text-slate-500 mt-3 pt-3 border-t border-slate-100 leading-relaxed">
+                            <strong class="text-slate-700">Nota:</strong> La dispersión aleatoria de eᵢ = Yᵢ - Ŷᵢ en torno a cero valida linealidad.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ========== PANEL 02: MATRICIAL ========== -->
+            <div id="panel-algebra" class="hidden space-y-5">
+                <div class="card overflow-hidden">
+                    <div class="px-5 sm:px-6 py-4 border-b border-slate-200 flex justify-between items-center">
+                        <h3 class="font-serif-acad text-base font-semibold text-slate-900">Vector β e Interpretación</h3>
+                        <span class="mono text-[11px] text-slate-500">β ∈ ℝ⁵ˣ¹</span>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-50 text-[10px] uppercase tracking-widest text-slate-500">
+                                    <th class="py-3 px-5 sm:px-6">Símbolo</th>
+                                    <th class="py-3 px-5 sm:px-6">Variable</th>
+                                    <th class="py-3 px-5 sm:px-6 text-right">βᵢ</th>
+                                    <th class="py-3 px-5 sm:px-6">Interpretación</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100 text-xs">
+                                {% for item in resultado.interpretaciones %}
+                                <tr class="hover:bg-brand-50/40">
+                                    <td class="py-3.5 px-5 sm:px-6 mono font-semibold text-brand-700">{{ item.simbolo }}</td>
+                                    <td class="py-3.5 px-5 sm:px-6 font-medium text-slate-800">{{ item.variable }}</td>
+                                    <td class="py-3.5 px-5 sm:px-6 mono text-right font-semibold text-slate-900">{{ item.valor }}</td>
+                                    <td class="py-3.5 px-5 sm:px-6 text-slate-500 leading-relaxed">{{ item.explicacion }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 xl:grid-cols-2 gap-5">
+                    <div class="card p-5 sm:p-6">
+                        <div class="flex justify-between items-baseline mb-3">
+                            <h4 class="font-serif-acad text-base font-semibold text-slate-900">Matriz X</h4>
+                            <span class="mono text-[11px] text-slate-500">{{ resultado.dimensiones_x }}</span>
+                        </div>
+                        <p class="text-xs text-slate-500 mb-3">Columna inicial unitaria para β₀.</p>
+                        <div class="overflow-x-auto">
+                            <table class="w-full mono text-xs text-center border border-slate-200 rounded-lg overflow-hidden">
+                                <thead class="bg-brand-50/70 text-brand-800">
+                                    <tr><th class="p-2 border-r border-slate-200">1</th><th class="p-2 border-r border-slate-200">X₁</th><th class="p-2 border-r border-slate-200">X₂</th><th class="p-2 border-r border-slate-200">X₃</th><th class="p-2">X₄</th></tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100">
+                                    {% for fila in resultado.matriz_x_muestra %}
+                                    <tr class="hover:bg-slate-50">{% for val in fila %}<td class="p-2 border-r border-slate-100 last:border-r-0">{{ val }}</td>{% endfor %}</tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="card p-5 sm:p-6 flex flex-col justify-between">
+                        <div>
+                            <div class="flex justify-between items-baseline mb-3">
+                                <h4 class="font-serif-acad text-base font-semibold text-slate-900">Matriz Xᵀ</h4>
+                                <span class="mono text-[11px] text-slate-500">{{ resultado.dimensiones_xt }}</span>
+                            </div>
+                            <p class="text-xs text-slate-500 mb-3">Permite conformar (XᵀX) ∈ ℝ⁵ˣ⁵.</p>
+                            <div class="overflow-x-auto">
+                                <table class="w-full mono text-xs text-center border border-slate-200 rounded-lg overflow-hidden">
+                                    <tbody class="divide-y divide-slate-100">
+                                        {% for fila in resultado.matriz_xt_muestra %}
+                                        <tr class="hover:bg-slate-50">{% for val in fila %}<td class="p-2 border-r border-slate-100 last:border-r-0">{{ val }}</td>{% endfor %}</tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="mt-5 pt-4 border-t border-slate-200">
+                            <span class="text-xs font-semibold text-slate-800 block mb-2">Vector Y (muestra):</span>
+                            <div class="mono text-xs bg-slate-50 border border-slate-200 rounded-lg p-3 text-slate-800">
+                                Y = [ {{ resultado.vector_y_muestra|join:", " }} ]ᵀ
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ========== PANEL 03: REGISTROS ========== -->
+            <div id="panel-registros" class="hidden space-y-5">
+                <div class="card overflow-hidden">
+                    <div class="px-5 sm:px-6 py-4 border-b border-slate-200">
+                        <h3 class="font-serif-acad text-base font-semibold text-slate-900">Resumen Estadístico</h3>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-50 text-[10px] uppercase tracking-widest text-slate-500">
+                                    <th class="py-3 px-5 sm:px-6">Variable</th>
+                                    <th class="py-3 px-5 sm:px-6 text-right">Media</th>
+                                    <th class="py-3 px-5 sm:px-6 text-right">σ</th>
+                                    <th class="py-3 px-5 sm:px-6 text-right">Mín</th>
+                                    <th class="py-3 px-5 sm:px-6 text-right">Máx</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100 text-xs mono">
+                                {% for row in resultado.resumen_datos %}
+                                <tr class="hover:bg-brand-50/40">
+                                    <td class="py-3 px-5 sm:px-6 font-sans font-medium text-slate-900">{{ row.variable }}</td>
+                                    <td class="py-3 px-5 sm:px-6 text-right">{{ row.promedio }}</td>
+                                    <td class="py-3 px-5 sm:px-6 text-right">{{ row.desviacion }}</td>
+                                    <td class="py-3 px-5 sm:px-6 text-right">{{ row.minimo }}</td>
+                                    <td class="py-3 px-5 sm:px-6 text-right">{{ row.maximo }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="card overflow-hidden">
+                    <div class="px-5 sm:px-6 py-4 border-b border-slate-200 flex justify-between items-center">
+                        <h3 class="font-serif-acad text-base font-semibold text-slate-900">Dataset Cargado</h3>
+                        <span class="mono text-[11px] text-slate-500">{{ resultado.total_registros }} obs.</span>
+                    </div>
+                    <div class="overflow-x-auto max-h-[460px]">
+                        <table class="w-full text-center border-collapse mono text-xs">
+                            <thead class="bg-brand-50/70 text-brand-900 sticky top-0 z-10">
+                                <tr>
+                                    <th class="py-2.5 px-3 border-r border-slate-200">ID</th>
+                                    <th class="py-2.5 px-3 border-r border-slate-200">X1</th>
+                                    <th class="py-2.5 px-3 border-r border-slate-200">X2</th>
+                                    <th class="py-2.5 px-3 border-r border-slate-200">X3</th>
+                                    <th class="py-2.5 px-3 border-r border-slate-200">X4</th>
+                                    <th class="py-2.5 px-3">Y</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                {% for reg in resultado.registros_tabla %}
+                                <tr class="hover:bg-brand-50/40">
+                                    <td class="py-2 px-3 text-slate-400 border-r border-slate-100">{{ forloop.counter }}</td>
+                                    <td class="py-2 px-3 border-r border-slate-100">{{ reg.X1 }}</td>
+                                    <td class="py-2 px-3 border-r border-slate-100">{{ reg.X2 }}</td>
+                                    <td class="py-2 px-3 border-r border-slate-100">{{ reg.X3 }}</td>
+                                    <td class="py-2 px-3 border-r border-slate-100">{{ reg.X4 }}</td>
+                                    <td class="py-2 px-3 font-semibold text-brand-700 bg-brand-50/30">{{ reg.Y }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            {% endif %}
+        </main>
+    </div>
+
+    <script>
+        function setTab(name) {
+            ['diagnostico', 'algebra', 'registros'].forEach(tab => {
+                document.getElementById('panel-' + tab).classList.add('hidden');
+                document.getElementById('tab-btn-' + tab).classList.remove('active');
+            });
+            document.getElementById('panel-' + name).classList.remove('hidden');
+            document.getElementById('tab-btn-' + name).classList.add('active');
+        }
+    </script>
+</body>
+</html>

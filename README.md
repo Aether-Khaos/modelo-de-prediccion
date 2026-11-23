@@ -9,9 +9,9 @@
 
 1. Clonar el repositorio:
 
-cd sistema-prediccion
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-python manage.py migrate
-python manage.py runserveriniti
+- cd sistema-prediccion
+- python3 -m venv venv
+- source venv/bin/activate
+- pip install -r requirements.txt
+- python manage.py migrate
+- python manage.py runserver
